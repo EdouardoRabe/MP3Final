@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Composer — Rabe Music{% endblock %}
+
+{% block content %}
+<script>
+window.ALL_GENRES    = [{% for g in genres %}"{{ g|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+window.ALL_ARTISTS   = [{% for a in artists %}"{{ a|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+window.ALL_LANGUAGES = [{% for l in languages %}"{{ l|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}];
+</script>
+
+<div x-data="playlistGenerator()">
+
+<div class="page-inner">
+
+    <div class="page-hero">
+        <h1>Composer</h1>
+        <p class="page-hero-sub">L'algorithme sélectionne les meilleurs morceaux pour atteindre ta durée cible.</p>
+    </div>
+
+    <div class="gen-layout">
+
+        <!-- Panneau de paramètres -->
+        <div class="gen-panel">
+            <div class="gen-panel-head">
+                <i class="bi bi-sliders2"></i>
+                <span>Paramètres</span>
+            </div>
+            <div class="gen-panel-body">
+
+                <!-- Genre -->
+                <div class="mb-3">
+                    <label class="form-label">Style musical</label>
+                    <div class="tag-select">
+                        <div class="tag-list">
+                            <template x-for="(g, idx) in filters.genre" :key="g">
+                                <span class="tag-pill">
+                                    <span x-text="g"></span>
+                                    <button type="button" class="tag-remove" @click="removeTag('genre', idx)">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="tag-input-row">
+                            <select class="form-select tag-input" x-model="selectedGenre">
+                                <option value="">— Choisir —</option>
+                                {% for g in genres %}
+                                <option value="{{ g }}" x-show="!filters.genre.includes('{{ g|escapejs }}')">{{ g }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tag-add-btn"
+                                    @click="addTag('genre')" :disabled="!selectedGenre">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Artiste -->
+                <div class="mb-3">
+                    <label class="form-label">Artiste</label>
+                    <div class="tag-select">
+                        <div class="tag-list">
+                            <template x-for="(a, idx) in filters.artist" :key="a">
+                                <span class="tag-pill">
+                                    <span x-text="a"></span>
+                                    <button type="button" class="tag-remove" @click="removeTag('artist', idx)">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="tag-input-row">
+                            <select class="form-select tag-input" x-model="selectedArtist">
+                                <option value="">— Choisir —</option>
+                                {% for a in artists %}
+                                <option value="{{ a }}" x-show="!filters.artist.includes('{{ a|escapejs }}')">{{ a }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tag-add-btn"
+                                    @click="addTag('artist')" :disabled="!selectedArtist">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Langue -->
+                <div class="mb-3">
+                    <label class="form-label">Langue</label>
+                    <div class="tag-select">
+                        <div class="tag-list">
+                            <template x-for="(l, idx) in filters.language" :key="l">
+                                <span class="tag-pill">
+                                    <span x-text="l"></span>
+                                    <button type="button" class="tag-remove" @click="removeTag('language', idx)">&times;</button>
+                                </span>
+                            </template>
+                        </div>
+                        <div class="tag-input-row">
+                            <select class="form-select tag-input" x-model="selectedLanguage">
+                                <option value="">— Choisir —</option>
+                                {% for l in languages %}
+                                <option value="{{ l }}" x-show="!filters.language.includes('{{ l|escapejs }}')">{{ l }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-secondary tag-add-btn"
+                                    @click="addTag('language')" :disabled="!selectedLanguage">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Durée -->
+                <div class="mb-4">
+                    <label class="form-label">Durée cible (minutes)</label>
+                    <input type="number" class="form-control" x-model.number="filters.target_minutes"
+                           min="1" max="600" placeholder="45">
+                    <div class="form-text">L'algorithme optimise la sélection pour cette durée.</div>
+                </div>
+
+                <button class="btn btn-primary w-100" @click="generate()" :disabled="generating">
+                    <span x-show="!generating"><i class="bi bi-stars me-1"></i>Lancer</span>
+                    <span x-show="generating">
+                        <span class="spinner-border spinner-border-sm me-1"></span>Recherche...
+                    </span>
+                </button>
+
+                <div x-show="error" class="toast-flash mt-3 mb-0" x-text="error"></div>
+            </div>
+
+            <!-- Résumé algorithme -->
+            <div x-show="algorithmMeta" style="border-top:1px solid var(--border-subtle);padding:16px 22px;">
+                <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:10px;font-weight:600;">
+                    Résultat algorithme
+                </div>
+                <div class="d-flex justify-content-between mb-1" style="font-size:0.82rem;">
+                    <span class="text-muted">Méthode</span>
+                    <span x-text="algorithmMeta?.algorithm"></span>
+                </div>
+                <div class="d-flex justify-content-between mb-1" style="font-size:0.82rem;">
+                    <span class="text-muted">Tolérance</span>
+                    <span x-show="algorithmMeta?.relaxation" style="color:var(--accent);">Élargie</span>
+                    <span x-show="!algorithmMeta?.relaxation" class="text-muted">Stricte</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1" style="font-size:0.82rem;">
+                    <span class="text-muted">Examinés</span>
+                    <span x-text="algorithmMeta?.track_count + ' titres'"></span>
+                </div>
+                <div class="d-flex justify-content-between" style="font-size:0.82rem;">
+                    <span class="text-muted">Cible</span>
+                    <span x-text="formatDuration(algorithmMeta?.target_duration)"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zone de résultats -->
+        <div>
+            <!-- Chargement -->
+            <div x-show="generating" class="gen-results-empty">
+                <div class="spinner-border mb-3"></div>
+                <p class="text-muted">L'algorithme cherche la meilleure combinaison...</p>
+            </div>
+
+            <!-- État vide -->
+            <div x-show="!generating && resultTracks.length === 0 && !error" class="gen-results-empty">
+                <i class="bi bi-stars"></i>
+                <h5 style="font-weight:700;margin-bottom:8px;">Prêt à composer</h5>
+                <p class="text-muted" style="font-size:0.86rem;">Configure les paramètres et lance la génération.</p>
+            </div>
+
+            <!-- Résultats -->
+            <div x-show="resultTracks.length > 0" x-transition>
+                <!-- En-tête résultats -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="badge bg-primary" style="font-size:0.78rem;padding:5px 12px;"
+                              x-text="resultTracks.length + ' titre(s)'"></span>
+                        <span class="text-muted" style="font-size:0.84rem;"
+                              x-text="'Total : ' + formatDuration(totalDuration)"></span>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" @click="refreshAll()" :disabled="replacing">
+                            <i class="bi bi-arrow-repeat me-1"></i>Relancer
+                        </button>
+                        <button class="btn btn-sm btn-primary" @click="openSaveModal()">
+                            <i class="bi bi-check2 me-1"></i>Enregistrer
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Liste -->
+                <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);overflow:hidden;">
+                    <div id="sortable-list" x-ref="sortableList">
+                        <template x-for="(track, index) in resultTracks" :key="track.id">
+                            <div class="track-list-item" :data-id="track.id" style="cursor:default;">
+                                <i class="bi bi-grip-vertical fs-5" style="cursor:grab;color:var(--text-muted);flex-shrink:0;"></i>
+                                <div class="track-thumb" style="flex-shrink:0;">
+                                    <i class="bi bi-music-note"></i>
+                                </div>
+                                <div class="tl-info">
+                                    <div class="tl-title" x-text="track.title"></div>
+                                    <div class="tl-sub" x-text="track.artist + ' · ' + track.duration_formatted"></div>
+                                </div>
+                                <div class="d-flex gap-1 flex-shrink-0">
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            @click="previewTrack(track, index)" title="Écouter">
+                                        <i class="bi" :class="previewIndex === index && previewPlaying ? 'bi-pause-fill' : 'bi-play-fill'"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            @click="replaceTrack(index)" :disabled="replacing" title="Remplacer">
+                                        <i class="bi bi-shuffle"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @click="removeTrack(index)" title="Enlever">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /gen-layout -->
+
+</div><!-- /page-inner -->
+
+    <!-- Modal Enregistrement -->
+    <div class="modal fade" id="saveModal" tabindex="-1" x-ref="saveModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nouvelle collection</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom</label>
+                        <input type="text" class="form-control" x-model="saveForm.name"
+                               placeholder="Ex : Soirée chill, Road trip...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" x-model="saveForm.description" rows="2"
+                                  placeholder="Une courte description..."></textarea>
+                    </div>
+                    <div x-show="saveError" class="toast-flash" x-text="saveError"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button class="btn btn-primary" @click="savePlaylist()" :disabled="saving">
+                        <span x-show="!saving">Créer</span>
+                        <span x-show="saving" class="spinner-border spinner-border-sm"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/playlist-builder.js' %}"></script>
+{% endblock %}

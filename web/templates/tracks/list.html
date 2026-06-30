@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Morceaux — Rabe Music{% endblock %}
+
+{% block content %}
+<div x-data="trackManager()" x-init="init()">
+
+<div class="page-inner">
+
+    <!-- En-tête de page -->
+    <div class="page-hero d-flex justify-content-between align-items-end">
+        <div>
+            <h1>Morceaux</h1>
+            <p class="page-hero-sub">
+                <span x-show="totalCount > 0" x-text="totalCount + ' titre(s) dans ta bibliothèque'"></span>
+                <span x-show="totalCount === 0">Aucun morceau importé</span>
+            </p>
+        </div>
+        <button class="btn btn-primary" @click="openCreateModal()">
+            <i class="bi bi-cloud-upload me-2"></i>Importer
+        </button>
+    </div>
+
+    <!-- Barre de filtres -->
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; align-items:center;">
+        <div style="position:relative; flex:1; min-width:220px; max-width:340px;">
+            <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#777;font-size:0.85rem;pointer-events:none;"></i>
+            <input type="search" class="form-control" placeholder="Titre, artiste, album..."
+                   style="padding-left:34px;"
+                   x-model="search" @input.debounce.300ms="fetchTracks()">
+        </div>
+        <select class="form-select" style="flex:1;min-width:150px;max-width:200px;"
+                x-model="filterGenre" @change="fetchTracks()">
+            <option value="">Tous les genres</option>
+            {% for g in genres %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+        </select>
+        <select class="form-select" style="flex:1;min-width:150px;max-width:200px;"
+                x-model="filterArtist" @change="fetchTracks()">
+            <option value="">Tous les artistes</option>
+            {% for a in artists %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+        </select>
+        <select class="form-select" style="flex:1;min-width:130px;max-width:170px;"
+                x-model="filterLanguage" @change="fetchTracks()">
+            <option value="">Toutes les langues</option>
+            {% for l in languages %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+        </select>
+    </div>
+
+    <!-- Spinner -->
+    <div x-show="loading" class="text-center py-5">
+        <div class="spinner-border" role="status"></div>
+        <p class="text-muted mt-3" style="font-size:0.85rem;">Chargement...</p>
+    </div>
+
+    <!-- Liste des morceaux -->
+    <div class="track-list-wrap" x-show="!loading">
+
+        <!-- En-tête colonnes -->
+        <div class="tl-header">
+            <span style="width:28px;flex-shrink:0;">#</span>
+            <span style="width:46px;flex-shrink:0;"></span>
+            <span class="sortable" style="flex:1;" @click="sortBy('title')">
+                Titre <i class="bi bi-arrow-down-up ms-1" style="opacity:0.4;font-size:0.6rem;"></i>
+            </span>
+            <span class="sortable" style="width:160px;flex-shrink:0;" @click="sortBy('artist')">
+                Artiste <i class="bi bi-arrow-down-up ms-1" style="opacity:0.4;font-size:0.6rem;"></i>
+            </span>
+            <span style="width:140px;flex-shrink:0;">Album</span>
+            <span style="width:88px;flex-shrink:0;">Genre</span>
+            <span style="width:52px;flex-shrink:0;">Langue</span>
+            <span class="sortable" style="width:44px;text-align:right;flex-shrink:0;" @click="sortBy('duration')">
+                <i class="bi bi-clock" style="opacity:0.5;"></i>
+            </span>
+            <span style="width:76px;flex-shrink:0;"></span>
+        </div>
+
+        <!-- Lignes -->
+        <template x-for="(track, idx) in tracks" :key="track.id">
+            <div class="tr">
+
+                <!-- Numéro -->
+                <div class="tr-num" x-text="idx + 1"></div>
+
+                <!-- Vignette colorée -->
+                <div class="tr-thumb" :class="'v' + ((idx % 6) + 1)">
+                    <i class="bi bi-music-note"></i>
+                    <div class="tr-play-hover">
+                        <i class="bi bi-play-fill"></i>
+                    </div>
+                </div>
+
+                <!-- Titre + nom de fichier -->
+                <div class="tr-main">
+                    <div class="tr-title" x-text="track.title"></div>
+                    <div class="tr-filename" x-text="track.original_filename"></div>
+                </div>
+
+                <!-- Artiste -->
+                <div class="tr-artist" x-text="track.artist"></div>
+
+                <!-- Album -->
+                <div class="tr-album" x-text="track.album || '—'"></div>
+
+                <!-- Genre -->
+                <div class="tr-genre">
+                    <span x-show="track.genre" class="badge" x-text="track.genre"></span>
+                    <span x-show="!track.genre" style="color:#666;font-size:0.8rem;">—</span>
+                </div>
+
+                <!-- Langue -->
+                <div class="tr-lang" x-text="track.language || '—'"></div>
+
+                <!-- Durée -->
+                <div class="tr-duration" x-text="track.duration_formatted"></div>
+
+                <!-- Actions (visibles au hover) -->
+                <div class="tr-actions">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            @click="openEditModal(track)" title="Modifier">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger"
+                            @click="confirmDelete(track)" title="Supprimer">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+
+            </div>
+        </template>
+
+        <!-- État vide -->
+        <div x-show="tracks.length === 0" style="padding:64px 32px;text-align:center;">
+            <i class="bi bi-music-note-list" style="font-size:3rem;opacity:0.08;display:block;margin-bottom:16px;"></i>
+            <p style="color:#888;font-size:0.9rem;">Aucun morceau trouvé. Change les filtres ou importe de nouveaux morceaux.</p>
+        </div>
+
+        <!-- Footer / Pagination -->
+        <div class="tl-footer" x-show="totalPages > 1 || totalCount > 0">
+            <small><span x-text="totalCount"></span> résultat(s)</small>
+            <nav x-show="totalPages > 1">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item" :class="{disabled: currentPage <= 1}">
+                        <button class="page-link" @click="goToPage(currentPage - 1)">&laquo;</button>
+                    </li>
+                    <template x-for="p in visiblePages" :key="p">
+                        <li class="page-item" :class="{active: p === currentPage}">
+                            <button class="page-link" x-text="p" @click="goToPage(p)"></button>
+                        </li>
+                    </template>
+                    <li class="page-item" :class="{disabled: currentPage >= totalPages}">
+                        <button class="page-link" @click="goToPage(currentPage + 1)">&raquo;</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div><!-- /page-inner -->
+
+    <!-- ===== Modal Import / Modification ===== -->
+    <div class="modal fade" id="trackModal" tabindex="-1" x-ref="trackModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"
+                        x-text="editingTrack ? 'Modifier les informations' : 'Importer un morceau'"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div x-show="!editingTrack" class="mb-3">
+                        <label class="form-label">Fichier audio</label>
+                        <input type="file" class="form-control" accept=".mp3,audio/mpeg"
+                               @change="onFileSelected">
+                        <div class="form-text">Format MP3 uniquement · Maximum 50 Mo.</div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Titre</label>
+                            <input type="text" class="form-control" x-model="form.title">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Artiste</label>
+                            <input type="text" class="form-control" x-model="form.artist">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Album</label>
+                            <input type="text" class="form-control" x-model="form.album">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Genre</label>
+                            <input type="text" class="form-control" x-model="form.genre"
+                                   list="genreList" autocomplete="off">
+                            <datalist id="genreList">
+                                {% for g in genres %}<option value="{{ g }}">{% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Langue</label>
+                            <input type="text" class="form-control" x-model="form.language"
+                                   list="languageList" autocomplete="off">
+                            <datalist id="languageList">
+                                {% for l in languages %}<option value="{{ l }}">{% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="col-md-6" x-show="!editingTrack">
+                            <label class="form-label">Durée (secondes)</label>
+                            <input type="number" step="0.01" class="form-control" x-model="form.duration">
+                        </div>
+                    </div>
+                    <div x-show="errorMsg" class="toast-flash mt-3 mb-0" x-text="errorMsg"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button class="btn btn-primary" @click="saveTrack()" :disabled="saving">
+                        <span x-show="!saving" x-text="editingTrack ? 'Enregistrer' : 'Importer'"></span>
+                        <span x-show="saving">
+                            <span class="spinner-border spinner-border-sm me-1"></span>Envoi...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Modal Suppression ===== -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" x-ref="deleteModal">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title">Supprimer le morceau</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:0.92rem;">Supprimer
+                        <strong x-text="deleteTarget?.title" style="color:#f2f2f2;"></strong> ?
+                    </p>
+                    <p style="color:#888;font-size:0.8rem;margin-bottom:0;">
+                        Le fichier sera définitivement supprimé du serveur.
+                    </p>
+                </div>
+                <div class="modal-footer border-0">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button class="btn btn-danger" @click="deleteTrack()">Supprimer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/track-manager.js' %}"></script>
+{% endblock %}

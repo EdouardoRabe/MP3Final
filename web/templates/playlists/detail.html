@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ playlist.name }} — Rabe Music{% endblock %}
+
+{% block content %}
+<div x-data="audioPlayer()" x-init="init('{{ playlist.id }}')">
+
+    <script type="application/json" id="playlist-data">{{ playlist_json|safe }}</script>
+
+    <!-- Hero immersif -->
+    <div class="detail-hero">
+        <div class="detail-hero-inner">
+            <div class="detail-art">
+                <i class="bi bi-collection-play-fill"></i>
+            </div>
+            <div class="detail-meta">
+                <div class="detail-type">Collection</div>
+                <h1 class="detail-title">{{ playlist.name }}</h1>
+                {% if playlist.description %}
+                    <p class="detail-desc">{{ playlist.description }}</p>
+                {% endif %}
+                <div class="detail-info-line">
+                    <strong id="track-count">—</strong> titres &nbsp;·&nbsp;
+                    <span id="total-duration">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-inner">
+
+        <!-- Actions -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'playlist_list' %}">Collections</a></li>
+                    <li class="breadcrumb-item active">{{ playlist.name }}</li>
+                </ol>
+            </nav>
+            <div class="d-flex gap-2">
+                <a href="/api/playlists/{{ playlist.id }}/download/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-download me-1"></i>Télécharger
+                </a>
+                <button class="btn btn-sm btn-outline-danger" @click="deletePlaylist('{{ playlist.id }}')">
+                    <i class="bi bi-trash me-1"></i>Supprimer
+                </button>
+            </div>
+        </div>
+
+        <!-- Bouton lecture -->
+        <div class="controls-bar">
+            <button class="btn-play-big" @click="playTrack(currentIndex >= 0 ? currentIndex : 0)">
+                <i class="bi" :class="playing ? 'bi-pause-fill' : 'bi-play-fill'"></i>
+            </button>
+            <div>
+                <div style="font-weight:600;font-size:0.9rem;" x-text="playing ? 'En lecture' : 'Prêt'"></div>
+                <div class="text-muted" style="font-size:0.76rem;" x-text="currentTrack ? currentTrack.title : 'Sélectionne un titre'"></div>
+            </div>
+        </div>
+
+        <!-- Liste des titres -->
+        <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);overflow:hidden;">
+            <template x-for="(entry, index) in playlistTracks" :key="entry.id">
+                <div class="track-list-item"
+                     :class="{ 'is-playing': currentIndex === index }"
+                     @click="playTrack(index)">
+
+                    <!-- Numéro / égaliseur -->
+                    <div class="tl-num">
+                        <span x-show="!(currentIndex === index && playing)" x-text="index + 1"></span>
+                        <div x-show="currentIndex === index && playing" class="equalizer">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+
+                    <!-- Vignette -->
+                    <div class="track-thumb" style="flex-shrink:0;">
+                        <i class="bi bi-music-note"></i>
+                    </div>
+
+                    <!-- Infos -->
+                    <div class="tl-info">
+                        <div class="tl-title" x-text="entry.track_detail?.title || '—'"></div>
+                        <div class="tl-sub"
+                             x-text="(entry.track_detail?.artist || '') + ' · ' + (entry.track_detail?.duration_formatted || '')"></div>
+                    </div>
+
+                    <!-- Retirer -->
+                    <button class="btn btn-sm btn-outline-danger" @click.stop="removeFromPlaylist(entry)">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </template>
+            <div x-show="playlistTracks.length === 0" class="text-center py-5 text-muted">
+                <i class="bi bi-music-note-list empty-state-icon"></i>
+                Cette collection est vide.
+            </div>
+        </div>
+
+    </div><!-- /page-inner -->
+
+    <!-- Barre de lecture -->
+    <div class="player-bar" x-show="currentTrack" x-transition>
+        <div class="player-track-info">
+            <div class="player-track-img">
+                <i class="bi bi-music-note-beamed fs-5"></i>
+            </div>
+            <div class="player-track-text">
+                <strong x-text="currentTrack?.title || '—'"></strong>
+                <small x-text="currentTrack?.artist || ''"></small>
+            </div>
+        </div>
+
+        <div class="player-controls">
+            <div class="player-buttons">
+                <button @click="prevTrack()" :disabled="currentIndex <= 0">
+                    <i class="bi bi-skip-start-fill fs-5"></i>
+                </button>
+                <button class="player-btn-play" @click="togglePlay()">
+                    <i class="bi" :class="playing ? 'bi-pause-fill' : 'bi-play-fill'"></i>
+                </button>
+                <button @click="nextTrack()" :disabled="currentIndex >= playlistTracks.length - 1">
+                    <i class="bi bi-skip-end-fill fs-5"></i>
+                </button>
+            </div>
+            <div class="player-progress">
+                <span x-text="formatTime(currentTime)">0:00</span>
+                <input type="range" min="0"
+                       :max="currentTrack?.duration || 100"
+                       x-model.number="seekPosition"
+                       @input="seekTo(seekPosition)">
+                <span x-text="formatTime(currentTrack?.duration || 0)">0:00</span>
+            </div>
+        </div>
+
+        <div class="player-volume">
+            <i class="bi bi-volume-down"></i>
+            <input type="range" min="0" max="1" step="0.05"
+                   x-model.number="volume" @input="setVolume(volume)">
+            <i class="bi bi-volume-up"></i>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/audio-player.js' %}"></script>
+{% endblock %}

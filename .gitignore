@@ -1,0 +1,45 @@
+# ── Environnements virtuels ──────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+CLAUDE.md
+
+# ── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Django ───────────────────────────────────────────────────────────
+web/db.sqlite3
+web/media/
+web/staticfiles/
+
+# ── Fichiers sensibles ────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.secret
+
+# ── Desktop pipeline ─────────────────────────────────────────────────
+desktop/logs/
+desktop/playlist/
+
+# ── Éditeurs / IDE ───────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop/logs/.fuse_hidden*

@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Collections — Rabe Music{% endblock %}
+
+{% block content %}
+<div class="page-inner">
+
+    <div class="page-hero d-flex justify-content-between align-items-end">
+        <div>
+            <h1>Collections</h1>
+            <p class="page-hero-sub">{{ playlists|length }} collection(s) sauvegardée(s)</p>
+        </div>
+        <a href="{% url 'playlist_generate' %}" class="btn btn-primary">
+            <i class="bi bi-stars me-1"></i>Créer
+        </a>
+    </div>
+
+    {% if playlists %}
+    <div class="playlist-grid">
+        {% for pl in playlists %}
+            {% if forloop.first %}
+            <a href="{% url 'playlist_detail' pl.id %}" class="playlist-card featured">
+                <div class="playlist-card-art">
+                    <i class="bi bi-collection-play-fill"></i>
+                    <div class="play-overlay"><i class="bi bi-play-circle-fill"></i></div>
+                </div>
+                <div class="playlist-card-info">
+                    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:8px;font-weight:600;">
+                        Collection vedette
+                    </div>
+                    <div class="playlist-card-name" style="font-size:1.3rem;">{{ pl.name }}</div>
+                    <div class="playlist-card-meta" style="margin-top:6px;">
+                        {% if pl.description %}{{ pl.description|truncatechars:60 }}{% else %}{{ pl.tc }} titres · {{ pl.duration_formatted }}{% endif %}
+                    </div>
+                </div>
+            </a>
+            {% else %}
+            <a href="{% url 'playlist_detail' pl.id %}" class="playlist-card">
+                <div class="playlist-card-art">
+                    <i class="bi bi-collection-play-fill"></i>
+                    <div class="play-overlay"><i class="bi bi-play-fill" style="font-size:1.5rem;"></i></div>
+                </div>
+                <div class="playlist-card-info">
+                    <div class="playlist-card-name">{{ pl.name }}</div>
+                    <div class="playlist-card-meta">
+                        {% if pl.description %}{{ pl.description|truncatechars:36 }}{% else %}{{ pl.tc }} titres{% endif %}
+                    </div>
+                </div>
+            </a>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="text-center py-5" style="padding-top:80px !important;">
+        <i class="bi bi-collection" style="font-size:4rem;opacity:0.07;display:block;margin-bottom:20px;"></i>
+        <h4 style="font-weight:700;margin-bottom:10px;">Aucune collection</h4>
+        <p class="text-muted" style="font-size:0.88rem;margin-bottom:24px;">
+            Utilise le compositeur pour générer ta première sélection musicale.
+        </p>
+        <a href="{% url 'playlist_generate' %}" class="btn btn-primary">
+            <i class="bi bi-stars me-1"></i>Commencer
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

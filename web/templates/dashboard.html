@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Rabe Music{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="dash-hero">
+    <div class="dash-hero-inner">
+        <div class="dash-hero-greeting">Bienvenue</div>
+        <h1 class="dash-hero-title">
+            Ta musique,<br><span>ton univers.</span>
+        </h1>
+        <div class="dash-stats">
+            <div class="dash-stat-pill">
+                <span class="num">{{ stats.total_tracks }}</span>
+                <span class="lbl">morceaux</span>
+            </div>
+            <div class="dash-stat-pill">
+                <span class="num">{{ stats.total_playlists }}</span>
+                <span class="lbl">collections</span>
+            </div>
+            <div class="dash-stat-pill">
+                <span class="num">{{ stats.total_duration_formatted }}</span>
+                <span class="lbl">d'écoute</span>
+            </div>
+            <div class="dash-stat-pill">
+                <span class="num">{{ stats.total_size_formatted }}</span>
+                <span class="lbl">stockage</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sections -->
+<div class="page-inner">
+
+    {% if recent_tracks %}
+    <div class="section-block">
+        <div class="section-header">
+            <h2>Ajouts récents</h2>
+            <a href="{% url 'track_list' %}">Tout voir</a>
+        </div>
+        <div class="cards-row">
+            {% for track in recent_tracks %}
+            {% with forloop.counter0|divisibleby:4 as mod %}
+            <div class="music-card">
+                <div class="music-card-art c{% cycle '1' '2' '3' '4' %}">
+                    <i class="bi bi-music-note-beamed"></i>
+                    <div class="music-card-play">
+                        <i class="bi bi-play-fill"></i>
+                    </div>
+                </div>
+                <div class="music-card-name">{{ track.title }}</div>
+                <div class="music-card-sub">{{ track.artist }}</div>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if recent_playlists %}
+    <div class="section-block">
+        <div class="section-header">
+            <h2>Collections récentes</h2>
+            <a href="{% url 'playlist_list' %}">Tout voir</a>
+        </div>
+        <div class="cards-row">
+            {% for pl in recent_playlists %}
+            <a href="{% url 'playlist_detail' pl.id %}" class="music-card">
+                <div class="music-card-art c{% cycle '3' '1' '4' '2' %}">
+                    <i class="bi bi-collection-play-fill"></i>
+                    <div class="music-card-play">
+                        <i class="bi bi-play-fill"></i>
+                    </div>
+                </div>
+                <div class="music-card-name">{{ pl.name }}</div>
+                <div class="music-card-sub">{{ pl.tc }} titres &middot; {{ pl.duration_formatted }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not recent_tracks and not recent_playlists %}
+    <div class="text-center py-5" style="padding-top:80px !important;">
+        <i class="bi bi-music-note-beamed" style="font-size:4rem; opacity:0.07; display:block; margin-bottom:20px;"></i>
+        <h4 style="font-weight:700; margin-bottom:10px;">Ta bibliothèque est vide</h4>
+        <p class="text-muted" style="font-size:0.9rem; margin-bottom:28px;">Importe tes premiers morceaux ou lance le pipeline desktop.</p>
+        <a href="{% url 'track_list' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Importer un morceau
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}
