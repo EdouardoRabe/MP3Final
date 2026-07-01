@@ -3,51 +3,73 @@
 {% block title %}Collections — Rabe Music{% endblock %}
 
 {% block content %}
-<div class="page-inner">
+<div x-data="playlistMerger()" class="page-inner">
 
     <div class="page-hero d-flex justify-content-between align-items-end">
         <div>
             <h1>Collections</h1>
             <p class="page-hero-sub">{{ playlists|length }} collection(s) sauvegardée(s)</p>
         </div>
-        <a href="{% url 'playlist_generate' %}" class="btn btn-primary">
-            <i class="bi bi-stars me-1"></i>Créer
-        </a>
+        <div class="d-flex gap-2 align-items-center">
+            <button x-show="selected.length >= 2" x-cloak
+                    @click="openMergeModal()"
+                    class="btn btn-outline-primary">
+                <i class="bi bi-collection me-1"></i>
+                Fusionner (<span x-text="selected.length"></span>)
+            </button>
+            <a href="{% url 'playlist_generate' %}" class="btn btn-primary">
+                <i class="bi bi-stars me-1"></i>Créer
+            </a>
+        </div>
     </div>
 
     {% if playlists %}
     <div class="playlist-grid">
         {% for pl in playlists %}
+
             {% if forloop.first %}
-            <a href="{% url 'playlist_detail' pl.id %}" class="playlist-card featured">
-                <div class="playlist-card-art">
-                    <i class="bi bi-collection-play-fill"></i>
-                    <div class="play-overlay"><i class="bi bi-play-circle-fill"></i></div>
-                </div>
-                <div class="playlist-card-info">
-                    <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:8px;font-weight:600;">
-                        Collection vedette
+            <div class="playlist-card-wrapper featured-wrapper">
+                <input type="checkbox" class="merge-cb"
+                       @click.stop="toggleSelect('{{ pl.id }}')"
+                       :checked="selected.includes('{{ pl.id }}')">
+                <a href="{% url 'playlist_detail' pl.id %}" class="playlist-card featured"
+                   :class="{'card-selected': selected.includes('{{ pl.id }}')}">
+                    <div class="playlist-card-art">
+                        <i class="bi bi-collection-play-fill"></i>
+                        <div class="play-overlay"><i class="bi bi-play-circle-fill"></i></div>
                     </div>
-                    <div class="playlist-card-name" style="font-size:1.3rem;">{{ pl.name }}</div>
-                    <div class="playlist-card-meta" style="margin-top:6px;">
-                        {% if pl.description %}{{ pl.description|truncatechars:60 }}{% else %}{{ pl.tc }} titres · {{ pl.duration_formatted }}{% endif %}
+                    <div class="playlist-card-info">
+                        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:8px;font-weight:600;">
+                            Collection vedette
+                        </div>
+                        <div class="playlist-card-name" style="font-size:1.3rem;">{{ pl.name }}</div>
+                        <div class="playlist-card-meta" style="margin-top:6px;">
+                            {% if pl.description %}{{ pl.description|truncatechars:60 }}{% else %}{{ pl.tc }} titres · {{ pl.duration_formatted }}{% endif %}
+                        </div>
                     </div>
-                </div>
-            </a>
+                </a>
+            </div>
             {% else %}
-            <a href="{% url 'playlist_detail' pl.id %}" class="playlist-card">
-                <div class="playlist-card-art">
-                    <i class="bi bi-collection-play-fill"></i>
-                    <div class="play-overlay"><i class="bi bi-play-fill" style="font-size:1.5rem;"></i></div>
-                </div>
-                <div class="playlist-card-info">
-                    <div class="playlist-card-name">{{ pl.name }}</div>
-                    <div class="playlist-card-meta">
-                        {% if pl.description %}{{ pl.description|truncatechars:36 }}{% else %}{{ pl.tc }} titres{% endif %}
+            <div class="playlist-card-wrapper">
+                <input type="checkbox" class="merge-cb"
+                       @click.stop="toggleSelect('{{ pl.id }}')"
+                       :checked="selected.includes('{{ pl.id }}')">
+                <a href="{% url 'playlist_detail' pl.id %}" class="playlist-card"
+                   :class="{'card-selected': selected.includes('{{ pl.id }}')}">
+                    <div class="playlist-card-art">
+                        <i class="bi bi-collection-play-fill"></i>
+                        <div class="play-overlay"><i class="bi bi-play-fill" style="font-size:1.5rem;"></i></div>
                     </div>
-                </div>
-            </a>
+                    <div class="playlist-card-info">
+                        <div class="playlist-card-name">{{ pl.name }}</div>
+                        <div class="playlist-card-meta">
+                            {% if pl.description %}{{ pl.description|truncatechars:36 }}{% else %}{{ pl.tc }} titres{% endif %}
+                        </div>
+                    </div>
+                </a>
+            </div>
             {% endif %}
+
         {% endfor %}
     </div>
 
@@ -64,5 +86,106 @@
     </div>
     {% endif %}
 
+    <!-- Modal Fusion -->
+    <div class="modal fade" id="mergeModal" tabindex="-1" x-ref="mergeModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-collection me-2"></i>Fusionner les collections</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted" style="font-size:0.82rem;margin-bottom:18px;">
+                        <span x-text="selected.length"></span> collection(s) sélectionnée(s) — les titres en double seront retirés automatiquement.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">Nom</label>
+                        <input type="text" class="form-control" x-model="mergeForm.name"
+                               placeholder="Ex : Best of, Mix soirée...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" x-model="mergeForm.description" rows="2"
+                                  placeholder="Une courte description..."></textarea>
+                    </div>
+                    <div x-show="mergeError" class="toast-flash mb-0" x-text="mergeError"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button class="btn btn-primary" @click="doMerge()" :disabled="merging">
+                        <span x-show="!merging"><i class="bi bi-collection me-1"></i>Créer la fusion</span>
+                        <span x-show="merging">
+                            <span class="spinner-border spinner-border-sm me-1"></span>Fusion en cours...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function playlistMerger() {
+    return {
+        selected: [],
+        mergeForm: { name: '', description: '' },
+        mergeError: '',
+        merging: false,
+        mergeModalInstance: null,
+
+        init() {
+            this.mergeModalInstance = new bootstrap.Modal(this.$refs.mergeModal);
+        },
+
+        toggleSelect(id) {
+            const idx = this.selected.indexOf(id);
+            if (idx === -1) {
+                this.selected.push(id);
+            } else {
+                this.selected.splice(idx, 1);
+            }
+        },
+
+        openMergeModal() {
+            this.mergeForm = { name: '', description: '' };
+            this.mergeError = '';
+            this.mergeModalInstance.show();
+        },
+
+        async doMerge() {
+            if (!this.mergeForm.name.trim()) {
+                this.mergeError = 'Le nom est obligatoire.';
+                return;
+            }
+            this.merging = true;
+            this.mergeError = '';
+            try {
+                const resp = await fetch('/api/playlists/merge/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playlist_ids: this.selected,
+                        name: this.mergeForm.name.trim(),
+                        description: this.mergeForm.description.trim(),
+                    }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(Object.values(err).flat().join(', ') || 'Erreur lors de la fusion');
+                }
+                const data = await resp.json();
+                this.mergeModalInstance.hide();
+                window.location.href = `/playlists/${data.id}/`;
+            } catch (e) {
+                this.mergeError = e.message;
+            } finally {
+                this.merging = false;
+            }
+        },
+    };
+}
+</script>
 {% endblock %}

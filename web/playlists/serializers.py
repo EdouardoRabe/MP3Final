@@ -100,6 +100,17 @@ class PlaylistUpdateSerializer(serializers.ModelSerializer):
         return instance
 
 
+class PlaylistMergeSerializer(serializers.Serializer):
+    """Serializer for the playlist merge request."""
+    playlist_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=2,
+        help_text="UUIDs des playlists à fusionner (minimum 2)",
+    )
+    name = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, default='')
+
+
 class PlaylistGenerateSerializer(serializers.Serializer):
     """Serializer for the playlist generation request."""
     genre = serializers.ListField(

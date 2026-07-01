@@ -22,6 +22,7 @@ from .serializers import (
     PlaylistCreateSerializer,
     PlaylistUpdateSerializer,
     PlaylistGenerateSerializer,
+    PlaylistMergeSerializer,
 )
 from .generator import generate_playlist
 
@@ -137,6 +138,50 @@ class PlaylistViewSet(viewsets.ModelViewSet):
                 'target_duration': data['target_duration'],
             },
         })
+
+    # ------------------------------------------------------------------
+    # POST /api/playlists/merge/
+    # ------------------------------------------------------------------
+    @action(detail=False, methods=['post'], url_path='merge')
+    def merge(self, request):
+        """
+        Fusionne plusieurs playlists en une nouvelle, sans doublons.
+        L'ordre : pistes de la 1ère playlist, puis pistes uniques de la 2ème, etc.
+        """
+        merge_serializer = PlaylistMergeSerializer(data=request.data)
+        merge_serializer.is_valid(raise_exception=True)
+        data = merge_serializer.validated_data
+
+        # Collecte les pistes dans l'ordre, déduplique par ID de piste
+        seen_ids = set()
+        ordered_track_ids = []
+
+        for pl_id in data['playlist_ids']:
+            try:
+                pl = Playlist.objects.get(id=pl_id)
+            except Playlist.DoesNotExist:
+                continue
+            for pt in pl.tracks.all():
+                if pt.track_id not in seen_ids:
+                    seen_ids.add(pt.track_id)
+                    ordered_track_ids.append(pt.track_id)
+
+        if not ordered_track_ids:
+            return Response(
+                {'error': 'Aucune piste trouvée dans les playlists sélectionnées.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_playlist = Playlist.objects.create(
+            name=data['name'],
+            description=data['description'] or None,
+        )
+        new_playlist.set_tracks(ordered_track_ids)
+
+        return Response(
+            PlaylistDetailSerializer(new_playlist).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     # ------------------------------------------------------------------
     # GET /api/playlists/{id}/download/
