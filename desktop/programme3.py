@@ -22,8 +22,30 @@ log = get_logger("programme3")
 API_URL = os.environ.get('DJANGO_API_URL', 'http://localhost:8000/api/tracks/')
 RABBITMQ_HOST = os.environ.get('RABBITMQ_HOST', 'localhost')
 QUEUE_NAME = 'list_mp3_p2'
+QUEUE_P4 = 'list_mp3_p3'
 MAX_RETRIES = 3
 RETRY_DELAY = 10
+
+
+# ---------------------------------------------------------------------------
+# Transmission vers P4
+# ---------------------------------------------------------------------------
+def forward_to_p4(name: str, path: str):
+    """Publie le chemin du fichier uploadé dans list_mp3_p3 pour que P4 le supprime."""
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+        channel = connection.channel()
+        channel.queue_declare(queue=QUEUE_P4, durable=True)
+        channel.basic_publish(
+            exchange='',
+            routing_key=QUEUE_P4,
+            body=json.dumps({'name': name, 'path': path}, ensure_ascii=False),
+        )
+        connection.close()
+        log.info("Fichier transmis a P4 pour suppression : %s", name)
+    except Exception as exc:
+        log.error("Echec de la transmission a P4 pour %s : %s", name, exc)
+        print(f"  [P4 ERREUR] Impossible de transmettre {name} a P4 : {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -164,14 +186,7 @@ def handle_message(body: bytes):
 
         if ok:
             success_count += 1
-            if os.path.isfile(path):
-                try:
-                    os.remove(path)
-                    log.info("Fichier local nettoye : %s", name)
-                except OSError as exc:
-                    log.warning(
-                        "Impossible de supprimer %s : %s", name, exc
-                    )
+            forward_to_p4(name, path)
         else:
             fail_count += 1
             log.error("Echec definitif pour %s apres %d tentatives", name, MAX_RETRIES)
