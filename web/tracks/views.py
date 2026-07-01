@@ -21,6 +21,7 @@ class TrackViewSet(viewsets.ModelViewSet):
     """
     ViewSet for CRUD operations on Tracks.
 
+    Accessible à tous sans authentification (tracks sont publics).
     Supports:
     - List with pagination, search, and filtering
     - Create with file upload
@@ -29,6 +30,9 @@ class TrackViewSet(viewsets.ModelViewSet):
     - Delete (removes file as well)
     - Streaming audio playback
     """
+    authentication_classes = []
+    permission_classes = []
+
     queryset = Track.objects.all()
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields: list[str] = []
