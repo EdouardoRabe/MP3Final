@@ -115,10 +115,12 @@ class PlaylistGenerateSerializer(serializers.Serializer):
         help_text="Liste de langues a inclure",
     )
     target_duration = serializers.IntegerField(
-        default=2700,
+        required=False,
+        allow_null=True,
+        default=None,
         min_value=60,
         max_value=36000,
-        help_text="Durée cible en secondes (défaut: 2700 = 45 min)",
+        help_text="Durée cible en secondes (optionnel — si absent, retourne tous les morceaux prioritaires)",
     )
     exclude_ids = serializers.ListField(
         child=serializers.UUIDField(),

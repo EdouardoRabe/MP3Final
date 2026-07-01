@@ -1,105 +1,138 @@
 """
-Algorithm for optimal playlist generation (KnapSack DP variant).
+Playlist generation — Priority-first algorithm.
 
-Given a set of filtered tracks and a target duration, finds the subset
-whose total duration is as close as possible to the target (without exceeding it,
-though slight overage is tolerated as a fallback).
+Logic:
+  Phase 1 — Priority tracks (matching user filters) are always included first.
+  Phase 2 — If a target duration is set and time remains after phase 1,
+             fill the gap with fallback tracks via knapsack DP.
+
+Cases:
+  - Filters + no duration  → return all priority tracks (no DP).
+  - Filters + duration     → all priority tracks first, then fill remaining time.
+  - Filters + duration, but priority tracks exceed target
+                           → knapsack DP within priority tracks only.
+  - No filters + duration  → knapsack DP on all tracks (classic behaviour).
+  - No filters + no duration → return all tracks (handled by the view).
 """
 import logging
-from typing import Optional
-
-from tracks.models import Track
 
 logger = logging.getLogger(__name__)
 
 
 def generate_playlist(
-    queryset,
-    target_seconds: int,
+    priority_queryset,
+    fallback_queryset=None,
+    target_seconds=None,
     max_tracks: int = 200,
 ) -> dict:
     """
-    Generate an optimal playlist using dynamic programming.
+    Generate a playlist that respects user preferences before duration.
 
     Args:
-        queryset: Filtered Track queryset.
-        target_seconds: Desired total duration in seconds.
-        max_tracks: Max number of tracks to consider (performance safeguard).
+        priority_queryset: Tracks matching the user's filters (always included first).
+        fallback_queryset: Other tracks used only to fill remaining time.
+        target_seconds:    Target total duration in seconds, or None for no limit.
+        max_tracks:        Hard cap on total tracks considered.
 
-    Returns:
-        dict with keys:
-            - track_ids: list of UUIDs in optimal order
-            - total_duration: sum of durations (float)
-            - algorithm: str describing the method used
-            - relaxation: bool indicating if overage was allowed
+    Returns dict with keys:
+        track_ids      — ordered list of UUIDs (priority tracks first)
+        total_duration — float seconds
+        algorithm      — str description
+        relaxation     — bool (True if overage was allowed)
     """
-    tracks = list(
-        queryset.values('id', 'duration')
-        .order_by('-duration')[:max_tracks]
+    priority_tracks = list(
+        priority_queryset
+        .values('id', 'duration')
+        .order_by('artist', 'title')
+        [:max_tracks]
     )
-    n = len(tracks)
 
-    if n == 0:
+    if not priority_tracks:
         return {
             'track_ids': [],
             'total_duration': 0.0,
-            'algorithm': 'dp_knapsack',
+            'algorithm': 'priority_first',
             'relaxation': False,
         }
 
-    # Convert durations to integer seconds (DP works with ints)
-    # Multiply by 10 for decisecond precision, then divide back later
-    precision = 10
-    target_scaled = target_seconds * precision
-    durations_scaled = [max(1, int(t['duration'] * precision)) for t in tracks]
+    # ── No duration target ────────────────────────────────────────────────
+    if target_seconds is None:
+        total = round(sum(float(t['duration'] or 0) for t in priority_tracks), 2)
+        return {
+            'track_ids': [t['id'] for t in priority_tracks],
+            'total_duration': total,
+            'algorithm': 'priority_only',
+            'relaxation': False,
+        }
 
-    # ---- Pass 1: Strict (no overage) ----
-    result = _knapsack_dp(tracks, durations_scaled, target_scaled)
+    # ── Duration target set ───────────────────────────────────────────────
+    precision = 10  # work in deciseconds (×10) for integer DP
+    target_scaled = int(target_seconds * precision)
 
-    best_duration_scaled = result['best_sum']
-    best_ids = result['best_ids']
+    priority_total = sum(float(t['duration'] or 0) for t in priority_tracks)
+    priority_scaled = int(priority_total * precision)
 
-    # If result is too far from target (> 40% gap), allow slight overage
+    if priority_scaled <= target_scaled:
+        # All priority tracks fit → include them all, then fill remaining time
+        selected_ids = [t['id'] for t in priority_tracks]
+        remaining_scaled = target_scaled - priority_scaled
+        total_duration = round(priority_total, 2)
+
+        if remaining_scaled >= precision * 10 and fallback_queryset is not None:
+            max_filler = max(0, max_tracks - len(priority_tracks))
+            if max_filler > 0:
+                fallback_tracks = list(
+                    fallback_queryset
+                    .values('id', 'duration')
+                    .order_by('-duration')
+                    [:max_filler]
+                )
+                if fallback_tracks:
+                    durations_scaled = [
+                        max(1, int(float(t['duration'] or 0) * precision))
+                        for t in fallback_tracks
+                    ]
+                    filler = _knapsack_dp(fallback_tracks, durations_scaled, remaining_scaled)
+                    selected_ids = selected_ids + filler['best_ids']
+                    total_duration = round(priority_total + filler['best_sum'] / precision, 2)
+
+        return {
+            'track_ids': selected_ids,
+            'total_duration': total_duration,
+            'algorithm': 'priority_first',
+            'relaxation': False,
+        }
+
+    # Priority tracks exceed the target → DP within priority tracks only
+    logger.info(
+        "Priorité dépasse la cible (%.0fs > %.0fs) — DP sur morceaux prioritaires",
+        priority_total, target_seconds,
+    )
+    durations_scaled = [
+        max(1, int(float(t['duration'] or 0) * precision))
+        for t in priority_tracks
+    ]
+    result = _knapsack_dp(priority_tracks, durations_scaled, target_scaled)
+
     relaxation = False
-    if best_duration_scaled < target_scaled * 0.6:
-        logger.info(
-            "Relaxation activee : resultat strict = %.1fs pour cible %ds",
-            best_duration_scaled / precision,
-            target_seconds,
-        )
-        relaxed_target = int(target_scaled * 1.2)
-        result = _knapsack_dp(tracks, durations_scaled, relaxed_target)
-        best_duration_scaled = result['best_sum']
-        best_ids = result['best_ids']
-        relaxation = True
-
-    total_duration = round(best_duration_scaled / precision, 2)
+    if result['best_sum'] < target_scaled * 0.6:
+        relaxed = _knapsack_dp(priority_tracks, durations_scaled, int(target_scaled * 1.2))
+        if relaxed['best_sum'] > result['best_sum']:
+            result = relaxed
+            relaxation = True
 
     return {
-        'track_ids': best_ids,
-        'total_duration': total_duration,
-        'algorithm': 'dp_knapsack',
+        'track_ids': result['best_ids'],
+        'total_duration': round(result['best_sum'] / precision, 2),
+        'algorithm': 'priority_knapsack',
         'relaxation': relaxation,
     }
 
 
-def _knapsack_dp(
-    tracks: list,
-    durations: list,
-    target: int,
-) -> dict:
+def _knapsack_dp(tracks: list, durations: list, target: int) -> dict:
     """
-    Core KnapSack DP: maximize total duration without exceeding target.
-
-    Complexity: O(n × target) where n = len(tracks).
-
-    Args:
-        tracks: List of {'id': UUID, 'duration': float} dicts.
-        durations: Pre-scaled integer durations.
-        target: Target sum (integer, scaled).
-
-    Returns:
-        {'best_sum': int, 'best_ids': list}
+    0/1 Knapsack DP: maximize total duration without exceeding target.
+    Complexity: O(n × target).
     """
     n = len(tracks)
     dp = [0] * (target + 1)
@@ -116,12 +149,6 @@ def _knapsack_dp(
                 dp[d] = candidate
                 chosen[d] = chosen[d - dur] + [track_id]
 
-    # Find the best achievable sum
     best_sum = max(dp)
-    best_idx = dp.index(best_sum)
-    best_ids = chosen[best_idx]
-
-    return {
-        'best_sum': best_sum,
-        'best_ids': best_ids,
-    }
+    best_ids = chosen[dp.index(best_sum)]
+    return {'best_sum': best_sum, 'best_ids': best_ids}

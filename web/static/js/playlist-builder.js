@@ -9,7 +9,8 @@ function playlistGenerator() {
             genre: [],
             artist: [],
             language: [],
-            target_minutes: 45,
+            target_minutes: 115,
+            no_duration: false,
         },
         generating: false,
         replacing: false,
@@ -78,18 +79,20 @@ function playlistGenerator() {
             this.resultTracks = [];
             this.previewStop();
 
-            const targetSeconds = this.filters.target_minutes * 60;
+            const body = {
+                genre: this.filters.genre,
+                artist: this.filters.artist,
+                language: this.filters.language,
+            };
+            if (!this.filters.no_duration && this.filters.target_minutes) {
+                body.target_duration = this.filters.target_minutes * 60;
+            }
 
             try {
                 const resp = await fetch('/api/playlists/generate/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        genre: this.filters.genre,
-                        artist: this.filters.artist,
-                        language: this.filters.language,
-                        target_duration: targetSeconds,
-                    }),
+                    body: JSON.stringify(body),
                 });
 
                 if (!resp.ok) {
@@ -123,17 +126,19 @@ function playlistGenerator() {
             const excludeIds = this.resultTracks.map(t => t.id);
 
             try {
-                const targetSeconds = this.filters.target_minutes * 60;
+                const body = {
+                    genre: this.filters.genre,
+                    artist: this.filters.artist,
+                    language: this.filters.language,
+                    exclude_ids: excludeIds,
+                };
+                if (!this.filters.no_duration && this.filters.target_minutes) {
+                    body.target_duration = this.filters.target_minutes * 60;
+                }
                 const resp = await fetch('/api/playlists/generate/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        genre: this.filters.genre,
-                        artist: this.filters.artist,
-                        language: this.filters.language,
-                        target_duration: targetSeconds,
-                        exclude_ids: excludeIds,
-                    }),
+                    body: JSON.stringify(body),
                 });
 
                 if (!resp.ok) throw new Error('Erreur remplacement');

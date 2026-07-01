@@ -80,26 +80,58 @@ class PlaylistViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='generate')
     def generate(self, request):
         """
-        Generate an optimal playlist based on filters and target duration.
+        Generate a playlist using priority-first selection.
+
+        Priority tracks (matching filters) are always included first.
+        Fallback tracks fill remaining time only when a target duration is set.
         """
         gen_serializer = PlaylistGenerateSerializer(data=request.data)
         gen_serializer.is_valid(raise_exception=True)
         data = gen_serializer.validated_data
 
-        # Build filtered queryset
-        qs = Track.objects.all()
-        for field in ['genre', 'artist', 'language']:
-            values = data.get(field, [])
-            if values:
-                query = Q()
-                for v in values:
-                    query |= Q(**{f'{field}__iexact': v})
-                qs = qs.filter(query)
-        if data.get('exclude_ids'):
-            qs = qs.exclude(id__in=data['exclude_ids'])
+        target_duration = data.get('target_duration')  # None when not provided
+        has_filters = any(data.get(f, []) for f in ['genre', 'artist', 'language'])
 
-        # Run DP algorithm
-        result = generate_playlist(qs, data['target_duration'])
+        # At least one criterion is required
+        if not has_filters and target_duration is None:
+            return Response(
+                {'error': 'Spécifie au moins un filtre (genre, artiste, langue) ou une durée cible.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        base_qs = Track.objects.all()
+        if data.get('exclude_ids'):
+            base_qs = base_qs.exclude(id__in=data['exclude_ids'])
+
+        if has_filters:
+            # Build priority queryset: tracks matching ALL specified filters (AND between fields).
+            # Artist uses __icontains to catch metadata variations ("Bob Marley & The Wailers"
+            # is captured when the user selects "Bob Marley").
+            # Genre and language use __iexact (values are standardized).
+            field_lookup = {'genre': 'iexact', 'artist': 'icontains', 'language': 'iexact'}
+            priority_q = Q()
+            for field in ['genre', 'artist', 'language']:
+                values = data.get(field, [])
+                if values:
+                    lookup = field_lookup[field]
+                    field_q = Q()
+                    for v in values:
+                        field_q |= Q(**{f'{field}__{lookup}': v})
+                    priority_q &= field_q
+
+            priority_qs = base_qs.filter(priority_q)
+            priority_ids = list(priority_qs.values_list('id', flat=True))
+            fallback_qs = base_qs.exclude(id__in=priority_ids)
+        else:
+            # No filters: all tracks have equal priority; no fallback needed
+            priority_qs = base_qs
+            fallback_qs = None
+
+        result = generate_playlist(
+            priority_queryset=priority_qs,
+            fallback_queryset=fallback_qs,
+            target_seconds=target_duration,
+        )
 
         if not result['track_ids']:
             return Response(
@@ -111,7 +143,7 @@ class PlaylistViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Fetch full track objects in the order returned by DP
+        # Fetch full track objects preserving the generator's order
         track_map = {
             str(t.id): t
             for t in Track.objects.filter(id__in=result['track_ids'])
@@ -134,7 +166,7 @@ class PlaylistViewSet(viewsets.ModelViewSet):
                 'algorithm': result['algorithm'],
                 'relaxation': result['relaxation'],
                 'track_count': len(ordered_tracks),
-                'target_duration': data['target_duration'],
+                'target_duration': target_duration,
             },
         })
 
