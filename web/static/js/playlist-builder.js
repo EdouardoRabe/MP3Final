@@ -83,7 +83,10 @@ function playlistGenerator() {
             try {
                 const resp = await fetch('/api/playlists/generate/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': window.getCsrfToken(),
+                    },
                     body: JSON.stringify({
                         genre: this.filters.genre,
                         artist: this.filters.artist,
@@ -126,7 +129,10 @@ function playlistGenerator() {
                 const targetSeconds = this.filters.target_minutes * 60;
                 const resp = await fetch('/api/playlists/generate/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': window.getCsrfToken(),
+                    },
                     body: JSON.stringify({
                         genre: this.filters.genre,
                         artist: this.filters.artist,
@@ -212,7 +218,10 @@ function playlistGenerator() {
             try {
                 const resp = await fetch('/api/playlists/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': window.getCsrfToken(),
+                    },
                     body: JSON.stringify({
                         name: this.saveForm.name.trim(),
                         description: this.saveForm.description.trim(),

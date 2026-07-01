@@ -11,4 +11,8 @@ urlpatterns = [
     path('playlists/', views.playlist_list, name='playlist_list'),
     path('playlists/generate/', views.playlist_generate, name='playlist_generate'),
     path('playlists/<uuid:playlist_id>/', views.playlist_detail, name='playlist_detail'),
+    # Authentification
+    path('login/', views.login_view, name='login'),
+    path('register/', views.register_view, name='register'),
+    path('logout/', views.logout_view, name='logout'),
 ]

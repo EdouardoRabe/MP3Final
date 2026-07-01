@@ -147,6 +147,19 @@ body {
 }
 .nav-search input::placeholder { color: var(--text-muted); }
 
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+.nav-username {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 /* ============================================================
    MAIN LAYOUT
    ============================================================ */

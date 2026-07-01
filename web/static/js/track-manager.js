@@ -130,7 +130,10 @@ function trackManager() {
                 try {
                     const resp = await fetch(`/api/tracks/${this.editingTrack.id}/`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': window.getCsrfToken(),
+                        },
                         body: JSON.stringify(this.form),
                     });
                     if (!resp.ok) {
@@ -162,6 +165,7 @@ function trackManager() {
 
                     const resp = await fetch('/api/tracks/', {
                         method: 'POST',
+                        headers: { 'X-CSRFToken': window.getCsrfToken() },
                         body: fd,
                     });
                     if (!resp.ok) {
@@ -188,6 +192,7 @@ function trackManager() {
             try {
                 const resp = await fetch(`/api/tracks/${this.deleteTarget.id}/`, {
                     method: 'DELETE',
+                    headers: { 'X-CSRFToken': window.getCsrfToken() },
                 });
                 if (!resp.ok) throw new Error('Erreur suppression');
                 this.deleteModalInstance.hide();

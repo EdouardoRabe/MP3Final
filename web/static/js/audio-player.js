@@ -181,7 +181,7 @@ function audioPlayer() {
                     try {
                         const resp = await fetch(
                             `/api/playlists/${self.playlistId}/tracks/${entry.track}/`,
-                            { method: 'DELETE' }
+                            { method: 'DELETE', headers: { 'X-CSRFToken': window.getCsrfToken() } }
                         );
                         if (!resp.ok) throw new Error('Erreur suppression');
 
@@ -210,6 +210,7 @@ function audioPlayer() {
                     try {
                         const resp = await fetch(`/api/playlists/${playlistId}/`, {
                             method: 'DELETE',
+                            headers: { 'X-CSRFToken': window.getCsrfToken() },
                         });
                         if (!resp.ok) throw new Error('Erreur suppression');
                         self.stopPlayback();

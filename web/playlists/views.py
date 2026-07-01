@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from tracks.models import Track
@@ -33,12 +34,20 @@ class PlaylistViewSet(viewsets.ModelViewSet):
 
     Extra actions:
     - POST /api/playlists/generate/  → optimal playlist generation
+    - POST /api/playlists/merge/     → merge playlists
     - GET  /api/playlists/{id}/download/ → ZIP download
     - DELETE /api/playlists/{id}/tracks/{track_id}/ → remove a track
     """
-    queryset = Playlist.objects.annotate(
-        track_count_annotated=Count('tracks')
-    )
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Playlist.objects.filter(user=self.request.user)
+            .annotate(track_count_annotated=Count('tracks'))
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -158,7 +167,7 @@ class PlaylistViewSet(viewsets.ModelViewSet):
 
         for pl_id in data['playlist_ids']:
             try:
-                pl = Playlist.objects.get(id=pl_id)
+                pl = Playlist.objects.get(id=pl_id, user=request.user)
             except Playlist.DoesNotExist:
                 continue
             for pt in pl.tracks.all():
@@ -175,6 +184,7 @@ class PlaylistViewSet(viewsets.ModelViewSet):
         new_playlist = Playlist.objects.create(
             name=data['name'],
             description=data['description'] or None,
+            user=request.user,
         )
         new_playlist.set_tracks(ordered_track_ids)
 

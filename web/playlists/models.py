@@ -3,6 +3,7 @@ Playlist & PlaylistTrack models.
 """
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.core.exceptions import ValidationError
 
@@ -10,6 +11,12 @@ from django.core.exceptions import ValidationError
 class Playlist(models.Model):
     """A named collection of tracks with a calculated total duration."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='playlists',
+        verbose_name='utilisateur',
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     total_duration = models.FloatField(default=0.0, help_text="Durée totale calculée en secondes")
