@@ -10,9 +10,16 @@ from django.http import HttpResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from rest_framework import viewsets, status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+
+class SessionAuthNoCSRF(SessionAuthentication):
+    """Session auth sans vérification CSRF — suffit pour séparer les users."""
+    def enforce_csrf(self, request):
+        return
 
 from tracks.models import Track
 
@@ -38,6 +45,7 @@ class PlaylistViewSet(viewsets.ModelViewSet):
     - GET  /api/playlists/{id}/download/ → ZIP download
     - DELETE /api/playlists/{id}/tracks/{track_id}/ → remove a track
     """
+    authentication_classes = [SessionAuthNoCSRF]
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

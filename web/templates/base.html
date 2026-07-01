@@ -91,7 +91,7 @@
 
 <script>
 window.getCsrfToken = function() {
-    return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    return '{{ csrf_token }}';
 };
 
 window.showToast = function(message, type) {
